@@ -1,0 +1,177 @@
+<!--
+  DMW Player (Diogenes Music Player for Woodland)
+  Copyright (C) 2025 Diogenes
+
+  This program is free software; you can redistribute it and/or
+  modify it under the terms of the GNU General Public License
+  as published by the Free Software Foundation; either version 2
+  of the License, or (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+-->
+
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>DMW Player</title>
+	<style>
+		body { font-family: sans-serif; margin: 20px; }
+		.header {
+			position: relative;   /* so children can position relative to it */
+			display: flex;
+			align-items: center;
+		}
+
+		#artwork {
+			position: absolute;
+			top: 0;          /* align with header top */
+			left: 330px;     /* adjust this to sit nicely next to title */
+		}
+
+		#artwork img {
+			height: 220px;   /* bigger artwork */
+			width: auto;     /* keep proportions */
+			border: 1px solid #ccc;
+			border-radius: 6px;
+		}
+
+		h3 { margin-top: 15px; margin-bottom: 5px; }
+		ul { list-style: none; padding: 0; }
+		li { margin: 4px 0; }
+		a { text-decoration: none; color: blue; cursor: pointer; }
+		a.active { font-weight: bold; color: darkred; }
+		.controls { margin: 10px 0; }
+		button { margin-right: 10px; padding: 5px 10px; }
+		#audio-wrapper { margin-bottom: 15px; }
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h2>DMW Player</h2>
+		<div id="artwork"><em>No artwork found</em></div>
+	</div>
+
+	<input type="file" id="picker" webkitdirectory multiple>
+	<div class="controls">
+		<button id="prev">⏮ Prev</button>
+		<button id="next">⏭ Next</button>
+	</div>
+	<div id="audio-wrapper">
+		<audio id="player" controls></audio>
+	</div>
+	<div id="playlist"></div>
+
+	<script>
+		const picker = document.getElementById('picker');
+		const playlistDiv = document.getElementById('playlist');
+		const player = document.getElementById('player');
+		const btnPrev = document.getElementById('prev');
+		const btnNext = document.getElementById('next');
+		const artworkDiv = document.getElementById('artwork');
+
+		let tracks = [];
+		let currentIndex = 0;
+		let folderArtworks = {}; // dir -> artwork URL or null
+
+		function showArtwork(dir) {
+			if (folderArtworks[dir]) {
+				artworkDiv.innerHTML = "";
+				let img = document.createElement("img");
+				img.src = folderArtworks[dir];
+				artworkDiv.appendChild(img);
+			}
+			else {
+				artworkDiv.innerHTML = "<em>No artwork found</em>";
+			}
+		}
+
+		function loadTrack(index) {
+			if (tracks.length === 0) return;
+			currentIndex = (index + tracks.length) % tracks.length; // wrap around
+			const track = tracks[currentIndex];
+			player.src = track.url;
+			player.play();
+
+			// highlight active track
+			document.querySelectorAll('#playlist a').forEach((a, i) => {
+				a.classList.toggle('active', i === currentIndex);
+			});
+
+			// update artwork
+			showArtwork(track.dir);
+		}
+
+		picker.addEventListener('change', () => {
+			playlistDiv.innerHTML = '';
+			tracks = [];
+			currentIndex = 0;
+			folderArtworks = {};
+
+			const files = Array.from(picker.files)
+				.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
+
+			let currentDir = '';
+
+			files.forEach(file => {
+				const relPath = file.webkitRelativePath;
+				const parts = relPath.split('/');
+				const dir = parts.slice(0, -1).join('/');
+				const name = file.name;
+				const ext = name.toLowerCase().split('.').pop();
+
+				// detect first image per folder
+				if (!folderArtworks[dir] && ["jpg","jpeg","png","gif","webp"].includes(ext)) {
+					folderArtworks[dir] = URL.createObjectURL(file);
+				}
+
+				// add only audio files to playlist
+				if (file.type.startsWith('audio/')) {
+					if (dir !== currentDir) {
+						currentDir = dir;
+						const header = document.createElement('h3');
+						header.textContent = dir;
+						playlistDiv.appendChild(header);
+						const ul = document.createElement('ul');
+						ul.dataset.dir = dir;
+						playlistDiv.appendChild(ul);
+					}
+
+					const ul = playlistDiv.querySelector(`ul[data-dir="${dir}"]`);
+					let li = document.createElement('li');
+					let link = document.createElement('a');
+					link.textContent = name;
+					link.href = "#";
+					link.addEventListener('click', e => {
+						e.preventDefault();
+						loadTrack(tracks.findIndex(t => t.name === relPath));
+					});
+					li.appendChild(link);
+					ul.appendChild(li);
+
+					tracks.push({name: relPath, url: URL.createObjectURL(file), dir: dir});
+				}
+			});
+
+			if (tracks.length > 0) {
+				loadTrack(0);
+			}
+		});
+
+		player.addEventListener('ended', () => {
+			loadTrack(currentIndex + 1); // autoplay next
+		});
+
+		btnPrev.addEventListener('click', () => loadTrack(currentIndex - 1));
+		btnNext.addEventListener('click', () => loadTrack(currentIndex + 1));
+	</script>
+</body>
+</html>
