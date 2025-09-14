@@ -38,7 +38,7 @@
 		}
 
 		#artwork img {
-			height: 220px;   /* bigger artwork */
+			height: 230px;   /* bigger artwork */
 			width: auto;     /* keep proportions */
 			border: 1px solid #ccc;
 			border-radius: 6px;
@@ -70,108 +70,169 @@
 	</div>
 	<div id="playlist"></div>
 
-	<script>
-		const picker = document.getElementById('picker');
-		const playlistDiv = document.getElementById('playlist');
-		const player = document.getElementById('player');
-		const btnPrev = document.getElementById('prev');
-		const btnNext = document.getElementById('next');
-		const artworkDiv = document.getElementById('artwork');
+<script>
+	const picker = document.getElementById('picker');
+	const playlistDiv = document.getElementById('playlist');
+	const player = document.getElementById('player');
+	const btnPrev = document.getElementById('prev');
+	const btnNext = document.getElementById('next');
+	const artworkDiv = document.getElementById('artwork');
 
-		let tracks = [];
-		let currentIndex = 0;
-		let folderArtworks = {}; // dir -> artwork URL or null
+	let tracks = [];
+	let currentIndex = 0;
+	let folderArtworks = {}; // dir -> artwork URL or null
+	let restoreState = null;
 
-		function showArtwork(dir) {
-			if (folderArtworks[dir]) {
-				artworkDiv.innerHTML = "";
-				let img = document.createElement("img");
-				img.src = folderArtworks[dir];
-				artworkDiv.appendChild(img);
-			}
-			else {
-				artworkDiv.innerHTML = "<em>No artwork found</em>";
-			}
+	// Try to load previous state
+	try {
+		restoreState = JSON.parse(localStorage.getItem("dmwplayer-state"));
+	} catch(e) {}
+
+	function saveState() {
+		if (!tracks.length) return;
+		localStorage.setItem("dmwplayer-state", JSON.stringify({
+			track: tracks[currentIndex].name,
+			time: player.currentTime
+		}));
+	}
+
+	function showArtwork(dir) {
+		if (folderArtworks[dir]) {
+			artworkDiv.innerHTML = "";
+			let img = document.createElement("img");
+			img.src = folderArtworks[dir];
+			artworkDiv.appendChild(img);
 		}
-
-		function loadTrack(index) {
-			if (tracks.length === 0) return;
-			currentIndex = (index + tracks.length) % tracks.length; // wrap around
-			const track = tracks[currentIndex];
-			player.src = track.url;
-			player.play();
-
-			// highlight active track
-			document.querySelectorAll('#playlist a').forEach((a, i) => {
-				a.classList.toggle('active', i === currentIndex);
-			});
-
-			// update artwork
-			showArtwork(track.dir);
+		else {
+			artworkDiv.innerHTML = "<em>No artwork found</em>";
 		}
+	}
 
-		picker.addEventListener('change', () => {
-			playlistDiv.innerHTML = '';
-			tracks = [];
-			currentIndex = 0;
-			folderArtworks = {};
-
-			const files = Array.from(picker.files)
-				.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
-
-			let currentDir = '';
-
-			files.forEach(file => {
-				const relPath = file.webkitRelativePath;
-				const parts = relPath.split('/');
-				const dir = parts.slice(0, -1).join('/');
-				const name = file.name;
-				const ext = name.toLowerCase().split('.').pop();
-
-				// detect first image per folder
-				if (!folderArtworks[dir] && ["jpg","jpeg","png","gif","webp"].includes(ext)) {
-					folderArtworks[dir] = URL.createObjectURL(file);
-				}
-
-				// add only audio files to playlist
-				if (file.type.startsWith('audio/')) {
-					if (dir !== currentDir) {
-						currentDir = dir;
-						const header = document.createElement('h3');
-						header.textContent = dir;
-						playlistDiv.appendChild(header);
-						const ul = document.createElement('ul');
-						ul.dataset.dir = dir;
-						playlistDiv.appendChild(ul);
-					}
-
-					const ul = playlistDiv.querySelector(`ul[data-dir="${dir}"]`);
-					let li = document.createElement('li');
-					let link = document.createElement('a');
-					link.textContent = name;
-					link.href = "#";
-					link.addEventListener('click', e => {
-						e.preventDefault();
-						loadTrack(tracks.findIndex(t => t.name === relPath));
-					});
-					li.appendChild(link);
-					ul.appendChild(li);
-
-					tracks.push({name: relPath, url: URL.createObjectURL(file), dir: dir});
-				}
-			});
-
-			if (tracks.length > 0) {
-				loadTrack(0);
+	function loadTrack(index, resumeTime=0) {
+		if (tracks.length === 0) return;
+		currentIndex = (index + tracks.length) % tracks.length; // wrap around
+		const track = tracks[currentIndex];
+		player.src = track.url;
+		player.play().then(() => {
+			if (resumeTime > 0) {
+				player.currentTime = resumeTime;
 			}
 		});
 
-		player.addEventListener('ended', () => {
-			loadTrack(currentIndex + 1); // autoplay next
+		// highlight active track
+		document.querySelectorAll('#playlist a').forEach((a, i) => {
+			a.classList.toggle('active', i === currentIndex);
 		});
 
-		btnPrev.addEventListener('click', () => loadTrack(currentIndex - 1));
-		btnNext.addEventListener('click', () => loadTrack(currentIndex + 1));
-	</script>
+		// update artwork
+		showArtwork(track.dir);
+
+		// save state
+		saveState();
+	}
+
+	// Show last opened folder if it exists
+	function showLastFolder() {
+		const rootFolder = localStorage.getItem("dmwplayer-lastfolder");
+		let lastInfo = document.getElementById("last-folder");
+		if (!lastInfo) {
+			lastInfo = document.createElement("div");
+			lastInfo.id = "last-folder";
+			document.body.insertBefore(lastInfo, picker.nextSibling);
+		}
+		if (rootFolder) {
+			lastInfo.textContent = "Last folder: " + rootFolder;
+		}
+		else {
+			lastInfo.textContent = "No folder opened yet";
+		}
+	}
+
+	// Run it right away when the page loads
+	showLastFolder();
+
+	picker.addEventListener('change', () => {
+		playlistDiv.innerHTML = '';
+		tracks = [];
+		currentIndex = 0;
+		folderArtworks = {};
+
+		const files = Array.from(picker.files)
+			.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
+
+		if (files.length > 0) {
+			// Save last folder root (first segment of path)
+			const rootFolder = files[0].webkitRelativePath.split('/')[0];
+			localStorage.setItem("dmwplayer-lastfolder", rootFolder);
+			showLastFolder(); // refresh the display
+		}
+
+		let currentDir = '';
+
+		files.forEach(file => {
+			const relPath = file.webkitRelativePath;
+			const parts = relPath.split('/');
+			const dir = parts.slice(0, -1).join('/');
+			const name = file.name;
+			const ext = name.toLowerCase().split('.').pop();
+
+			// detect first image per folder
+			if (!folderArtworks[dir] && ["jpg","jpeg","png","gif","webp"].includes(ext)) {
+				folderArtworks[dir] = URL.createObjectURL(file);
+			}
+
+			// add only audio files to playlist
+			if (file.type.startsWith('audio/')) {
+				if (dir !== currentDir) {
+					currentDir = dir;
+					const header = document.createElement('h3');
+					header.textContent = dir;
+					playlistDiv.appendChild(header);
+					const ul = document.createElement('ul');
+					ul.dataset.dir = dir;
+					playlistDiv.appendChild(ul);
+				}
+
+				const ul = playlistDiv.querySelector(`ul[data-dir="${dir}"]`);
+				let li = document.createElement('li');
+				let link = document.createElement('a');
+				link.textContent = name;
+				link.href = "#";
+				link.addEventListener('click', e => {
+					e.preventDefault();
+					loadTrack(tracks.findIndex(t => t.name === relPath));
+				});
+				li.appendChild(link);
+				ul.appendChild(li);
+
+				tracks.push({name: relPath, url: URL.createObjectURL(file), dir: dir});
+			}
+		});
+
+		if (tracks.length > 0) {
+			if (restoreState) {
+				let idx = tracks.findIndex(t => t.name === restoreState.track);
+				if (idx !== -1) {
+					loadTrack(idx, restoreState.time);
+					return;
+				}
+			}
+			loadTrack(0);
+		}
+	});
+
+	player.addEventListener('ended', () => {
+		loadTrack(currentIndex + 1); // autoplay next
+	});
+
+	btnPrev.addEventListener('click', () => loadTrack(currentIndex - 1));
+	btnNext.addEventListener('click', () => loadTrack(currentIndex + 1));
+
+	// Save time position periodically
+	player.addEventListener('timeupdate', () => {
+		if (!player.paused) saveState();
+	});
+</script>
+
 </body>
 </html>
