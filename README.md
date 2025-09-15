@@ -16,8 +16,6 @@ A web-based HTML offline music player to play your local music right in your bro
 
 ![Alt text](https://github.com/DiogenesN/dmwplayer/blob/main/dmwplayer.png)
 
-That's it!
-
 # Support
 
    My Libera IRC support channel: #linuxfriends
