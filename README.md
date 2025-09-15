@@ -1,4 +1,5 @@
 # DMW Player
+# Version: 2.0
 A web-based HTML offline music player to play your local music right in your browser. It works in your browser completely offline and plays audio files. It saves the playback state and resumes it when you open the same folder again. It also shows you the last opened folder name.
 
 # What you can do with DMW Player
