@@ -1,5 +1,6 @@
 <!--
   DMW Player (Diogenes Music Player for Woodland)
+  Version: 2.0
   Copyright (C) 2025 Diogenes
 
   This program is free software; you can redistribute it and/or
@@ -24,7 +25,32 @@
 	<meta charset="UTF-8">
 	<title>DMW Player</title>
 	<style>
+		.header, .controls, #audio-wrapper, #picker, #last-folder {
+			flex: 0 0 auto;         /* keep natural height, don’t grow */
+		}
+
 		body { font-family: sans-serif; margin: 20px; }
+		html, body {
+			height: 100%;           /* full height */
+			margin: 0;
+			padding: 0;
+		}
+
+		body {
+			display: flex;
+			flex-direction: column; /* stack vertically */
+			font-family: sans-serif;
+			margin: 20px;
+		}
+
+		#playlist {
+			flex: 1 1 auto;         /* take remaining space */
+			overflow-y: auto;       /* scroll inside */
+			border: 1px solid #ccc;
+			padding: 8px;
+			margin-top: 10px;
+		}
+
 		.header {
 			position: relative;   /* so children can position relative to it */
 			display: flex;
@@ -38,10 +64,16 @@
 		}
 
 		#artwork img {
-			height: 230px;   /* bigger artwork */
+			height: 210px;   /* bigger artwork */
 			width: auto;     /* keep proportions */
 			border: 1px solid #ccc;
 			border-radius: 6px;
+		}
+
+		#last-folder, #now-playing {
+			margin-top: 6px;
+			font-style: italic;
+			color: #444;
 		}
 
 		h3 { margin-top: 15px; margin-bottom: 5px; }
@@ -63,11 +95,14 @@
 	<input type="file" id="picker" webkitdirectory multiple>
 	<div class="controls">
 		<button id="prev">⏮ Prev</button>
-		<button id="next">⏭ Next</button>
+		<button id="next"> Next ⏭</button>
+		<button id="goto">🎯 Go to</button>
 	</div>
 	<div id="audio-wrapper">
 		<audio id="player" controls></audio>
 	</div>
+	<div id="last-folder"></div>
+	<div id="now-playing"></div>
 	<div id="playlist"></div>
 
 <script>
@@ -76,6 +111,7 @@
 	const player = document.getElementById('player');
 	const btnPrev = document.getElementById('prev');
 	const btnNext = document.getElementById('next');
+	const btnGoto = document.getElementById('goto');
 	const artworkDiv = document.getElementById('artwork');
 
 	let tracks = [];
@@ -108,6 +144,12 @@
 		}
 	}
 
+	// Update “Now playing” text
+	function updateNowPlaying(track) {
+		const np = document.getElementById("now-playing");
+		np.textContent = "Now playing: " + track.name.split('/').pop();
+	}
+
 	function loadTrack(index, resumeTime=0) {
 		if (tracks.length === 0) return;
 		currentIndex = (index + tracks.length) % tracks.length; // wrap around
@@ -120,12 +162,19 @@
 		});
 
 		// highlight active track
-		document.querySelectorAll('#playlist a').forEach((a, i) => {
+		const links = document.querySelectorAll('#playlist a');
+		links.forEach((a, i) => {
 			a.classList.toggle('active', i === currentIndex);
+			if (i === currentIndex) {
+				// scroll active track into view
+				a.scrollIntoView({ behavior: "smooth", block: "center" });
+			}
 		});
 
 		// update artwork
 		showArtwork(track.dir);
+		updateNowPlaying(track);
+
 
 		// save state
 		saveState();
@@ -141,7 +190,7 @@
 			document.body.insertBefore(lastInfo, picker.nextSibling);
 		}
 		if (rootFolder) {
-			lastInfo.textContent = "Last folder: " + rootFolder;
+			lastInfo.textContent = "Last opened folder: " + rootFolder;
 		}
 		else {
 			lastInfo.textContent = "No folder opened yet";
@@ -227,6 +276,12 @@
 
 	btnPrev.addEventListener('click', () => loadTrack(currentIndex - 1));
 	btnNext.addEventListener('click', () => loadTrack(currentIndex + 1));
+	btnGoto.addEventListener('click', () => {
+	const links = document.querySelectorAll('#playlist a');
+		if (links[currentIndex]) {
+			links[currentIndex].scrollIntoView({ behavior: "smooth", block: "center" });
+		}
+	});
 
 	// Save time position periodically
 	player.addEventListener('timeupdate', () => {
