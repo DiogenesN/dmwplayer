@@ -7,6 +7,9 @@ A web-based HTML offline music player to play your local music right in your bro
    2. Play your audio files.
    3. Display the artwork.
 
+### DMW Player is now available in the Chrome Web Store:
+https://chromewebstore.google.com/detail/dmw-player/adknbboajbemllhcjcibkjkmclmljomb
+
 # Installation/Usage
    1. Simply right click on dmwplayer.html and open it with your favorite web browser (or drag and drop).
    2. Click on the 'Choose Files' button and select the folder that contains your music and click on Upload.
