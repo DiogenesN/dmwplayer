@@ -1,6 +1,6 @@
 <!--
   DMW Player (Diogenes Music Player for Woodland)
-  Version: 2.0
+  Version: 2.1
   Copyright (C) 2025 Diogenes
 
   This program is free software; you can redistribute it and/or
@@ -229,6 +229,15 @@
 			if (!folderArtworks[dir] && ["jpg","jpeg","png","gif","webp"].includes(ext)) {
 				folderArtworks[dir] = URL.createObjectURL(file);
 			}
+
+			// skip formats
+			const skipExts = [
+				"m3u","m3u8","pls","asx","xspf","wpl","smil",
+				"cue","txt","nfo","log","json","xml","ini",
+				"sfv","md5","lrc"
+			];
+
+			if (skipExts.includes(ext)) return;
 
 			// add only audio files to playlist
 			if (file.type.startsWith('audio/')) {
